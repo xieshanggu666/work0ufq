@@ -7,6 +7,9 @@ const AN = require("./engine/analyzer");
 const M = require("./engine/models");
 const R = require("./engine/recovery");
 const P = require("./engine/prescribe");
+const PL = require("./engine/plan");
+
+const planStore = PL.createStore();
 
 const arg = process.argv.find(a => a.startsWith("--port="));
 const PORT = arg ? parseInt(arg.slice(7), 10) : parseInt(process.env.PORT || "8075", 10);
@@ -63,6 +66,8 @@ const server = http.createServer(async (req, res) => {
         sex_k: M.SEX_K,
         sports: A.SPORT_POOL,
         week_shape: A.WEEK_SHAPE,
+        plan_status: PL.PLAN_STATUS,
+        roles: PL.ROLES,
       });
     }
     if (p === "/api/simulate" && req.method === "POST") {
@@ -108,6 +113,45 @@ const server = http.createServer(async (req, res) => {
         increment: body.increment != null ? Number(body.increment) : null,
         deload: body.deload != null ? Number(body.deload) : null,
       }));
+    }
+    /* 教练训练计划协作 */
+    if (p === "/api/plans" && req.method === "GET") {
+      return json(res, 200, {
+        plans: PL.listPlans(planStore, {
+          role: url.searchParams.get("role") || "",
+          name: url.searchParams.get("name") || "",
+        }),
+      });
+    }
+    if (p === "/api/plans" && req.method === "POST") {
+      try {
+        const body = JSON.parse(await readBody(req));
+        const plan = PL.createPlan(planStore, body);
+        return json(res, 200, { plan: PL.detail(plan) });
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+    }
+    const mPlan = p.match(/^\/api\/plans\/([A-Za-z0-9-]+)(?:\/([a-z]+))?$/);
+    if (mPlan) {
+      const plan = planStore.plans.get(mPlan[1]);
+      if (!plan) return json(res, 404, { error: "计划不存在" });
+      try {
+        if (req.method === "GET" && !mPlan[2]) return json(res, 200, { plan: PL.detail(plan) });
+        if (req.method === "POST" && mPlan[2] === "writeback") {
+          const body = JSON.parse(await readBody(req));
+          PL.writeBack(planStore, plan.id, Array.isArray(body.days) ? body.days : []);
+          return json(res, 200, { plan: PL.detail(plan) });
+        }
+        if (req.method === "POST" && mPlan[2]) {
+          const body = JSON.parse(await readBody(req));
+          PL.transition(planStore, plan.id, mPlan[2], body.actor || {}, body);
+          return json(res, 200, { plan: PL.detail(plan) });
+        }
+      } catch (e) {
+        return json(res, 400, { error: e.message });
+      }
+      return json(res, 405, { error: "method not allowed" });
     }
 
     let f = p === "/" ? "/index.html" : p;

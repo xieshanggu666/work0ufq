@@ -94,6 +94,21 @@
   .tbl th { color: var(--muted); font-weight: 600; font-size: 12px; }
   .tbl .deload { color: var(--amber); font-weight: 700; }
   .hide { display: none; }
+  .plan-item { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; cursor: pointer; background: #fafcfb; }
+  .plan-item:hover { border-color: var(--brand); }
+  .plan-item.on { border-color: var(--brand); background: var(--brand-soft); }
+  .plan-item .t { font-size: 13px; font-weight: 700; }
+  .plan-item .m { font-size: 11px; color: var(--muted); margin: 2px 0 4px; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #fff; }
+  .btn { padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--ink); }
+  .btn:hover { border-color: var(--brand); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.danger { background: #fff; border-color: var(--red); color: var(--red); }
+  .act-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .risk-box { background: #fdf6ea; border: 1px solid var(--amber); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+  .tl { font-size: 12px; color: var(--muted); }
+  .tl .e { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .daytbl td, .daytbl th { padding: 5px 8px; font-size: 12px; }
   @media (max-width: 940px) {
     .wrap { flex-direction: column; }
     .side { width: 100%; height: auto; position: static; }
@@ -109,6 +124,7 @@
     <div class="tabs">
       <div class="tab on" data-tab="sim">模拟训练</div>
       <div class="tab" data-tab="log">自定义日志</div>
+      <div class="tab" data-tab="plan">协作计划</div>
     </div>
 
     <div id="sim_panel">
@@ -167,6 +183,45 @@
       <button class="go" id="go_log">分析日志</button>
     </div>
 
+    <div id="plan_panel" class="hide">
+      <div class="row2">
+        <div class="field"><label>我的角色</label>
+          <select id="my_role">
+            <option value="coach">教练</option>
+            <option value="athlete">运动员</option>
+            <option value="rehab">康复师</option>
+          </select>
+        </div>
+        <div class="field"><label>姓名</label><input type="text" id="my_name" value="王教练"></div>
+      </div>
+      <div id="plan_new">
+        <div class="field"><label>运动员姓名</label><input type="text" id="plan_athlete" value="李运动员"></div>
+        <div class="field"><label>计划名称（可空）</label><input type="text" id="plan_title" placeholder="如：冬训基础期"></div>
+        <div class="row2">
+          <div class="field"><label>开始日期</label><input type="text" id="plan_start" placeholder="2026-10-12"></div>
+          <div class="field"><label>周数</label>
+            <select id="plan_weeks">
+              <option value="4" selected>4 周</option>
+              <option value="8">8 周</option>
+              <option value="12">12 周</option>
+              <option value="16">16 周</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>周基准负荷</label>
+          <div class="range-row">
+            <input type="range" id="plan_base" min="200" max="1200" value="500" step="10">
+            <span class="v" id="plan_base_v">500</span>
+          </div>
+        </div>
+        <button class="go" id="go_plan">创建周期计划</button>
+        <div class="hint">创建时自动带入当前分析的 ACWR 与准备度用于风险评估；高风险计划须康复师复核通过后运动员才能确认执行。</div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>计划列表</label></div>
+      <div id="plan_list"></div>
+    </div>
+
     <div class="hint">采用 sRPE 与 Banister TRIMP 双口径负荷，EWMA 平滑计算急性（7 日）/慢性（28 日）负荷与 ACWR；以体能-疲劳脉冲响应、HRV 平衡、睡眠债与主观状态合成准备度评分，据此给出当日训练处方。</div>
   </aside>
 
@@ -176,6 +231,7 @@
       <div class="meta" id="view_meta"></div>
     </div>
 
+    <div id="analysis_view">
     <div class="status-row" id="status_row"></div>
     <div class="presc" id="presc"></div>
 
@@ -222,6 +278,11 @@
     <div class="chart-box">
       <h3>未来四周训练周期化</h3>
       <table class="tbl" id="period_tbl"></table>
+    </div>
+    </div>
+
+    <div id="plans_view" class="hide">
+      <div id="plan_detail"><div class="chart-box">从左侧选择或创建一个协作计划</div></div>
     </div>
   </main>
 </div>
@@ -426,6 +487,7 @@ function renderCharts(a) {
 function renderAll(a) {
   state.data = a;
   $("#view_meta").textContent = `训练 ${a.totals.weeks} 周 · ${a.totals.sessions} 次会话 · 累计负荷 ${a.totals.total_load} · 平均 rMSSD ${a.totals.avg_rmssd}ms · 平均睡眠 ${a.totals.avg_sleep}h`;
+  if (a.days && a.days.length) $("#plan_start").value = a.days[0].date;
   renderStatus(a);
   renderCharts(a);
 }
@@ -443,7 +505,8 @@ async function simulate() {
   const body = { profile, weeks: Number($("#weeks").value), seed: Number($("#seed").value) };
   const r = await fetch("/api/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const d = await r.json();
-  $("#view_title").textContent = "今日状态与处方 · 种子 " + d.athlete.seed;
+  state.viewTitle = "今日状态与处方 · 种子 " + d.athlete.seed;
+  $("#view_title").textContent = state.viewTitle;
   renderAll(d.analysis);
 }
 
@@ -459,7 +522,8 @@ async function analyzeLog() {
   const profile = { sex: "m", rest_hr: Number($("#log_rest_hr").value), max_hr: Number($("#log_max_hr").value) };
   const r = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessions, morning, profile }) });
   const d = await r.json();
-  $("#view_title").textContent = "自定义日志分析";
+  state.viewTitle = "自定义日志分析";
+  $("#view_title").textContent = state.viewTitle;
   renderAll(d);
 }
 
@@ -467,15 +531,211 @@ document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
-    const sim = t.dataset.tab === "sim";
-    $("#sim_panel").classList.toggle("hide", !sim);
-    $("#log_panel").classList.toggle("hide", sim);
+    const tab = t.dataset.tab;
+    $("#sim_panel").classList.toggle("hide", tab !== "sim");
+    $("#log_panel").classList.toggle("hide", tab !== "log");
+    $("#plan_panel").classList.toggle("hide", tab !== "plan");
+    $("#analysis_view").classList.toggle("hide", tab === "plan");
+    $("#plans_view").classList.toggle("hide", tab !== "plan");
+    if (tab === "plan") { loadPlans(); renderPlanDetail(); }
+    else if (state.data) { $("#view_title").textContent = state.viewTitle || "今日状态与处方"; }
   };
 });
 
 $("#base_load").oninput = () => { $("#base_load_v").textContent = $("#base_load").value; };
 $("#go_sim").onclick = simulate;
 $("#go_log").onclick = analyzeLog;
+
+/* ---------- 协作计划 ---------- */
+const ROLE_NAMES = { coach: "王教练", athlete: "李运动员", rehab: "陈康复师" };
+const ROLE_LABEL = { coach: "教练", athlete: "运动员", rehab: "康复师" };
+const ACT_LABEL = { create: "创建计划", submit: "提交确认", confirm: "确认执行", revise: "退回修改", review: "康复复核", pause: "暂停计划", resume: "恢复执行", archive: "归档" };
+const planState = { role: "coach", name: ROLE_NAMES.coach, plans: [], current: null };
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function fmtTime(s) {
+  return s ? s.slice(0, 16).replace("T", " ") : "";
+}
+function statusTag(st) {
+  const m = (state.meta && state.meta.plan_status && state.meta.plan_status[st]) || { label: st, color: "#999" };
+  return `<span class="badge" style="background:${m.color}">${m.label}</span>`;
+}
+
+async function loadPlans() {
+  const r = await fetch("/api/plans?role=" + planState.role + "&name=" + encodeURIComponent(planState.name));
+  const d = await r.json();
+  planState.plans = d.plans || [];
+  renderPlanList();
+}
+
+function renderPlanList() {
+  const el = $("#plan_list");
+  if (!planState.plans.length) { el.innerHTML = `<div class="hint">暂无相关计划</div>`; return; }
+  el.innerHTML = planState.plans.map(p => `
+    <div class="plan-item ${planState.current && planState.current.id === p.id ? "on" : ""}" data-id="${p.id}">
+      <div class="t">${esc(p.title)}</div>
+      <div class="m">${esc(p.athlete)} · ${p.start} 起 ${p.weeks} 周${p.risk && p.risk.high ? " · ⚠ 高风险" : ""}${p.review ? " · 已复核" : ""}</div>
+      ${statusTag(p.status)}
+    </div>`).join("");
+  el.querySelectorAll(".plan-item").forEach(it => { it.onclick = () => openPlan(it.dataset.id); });
+}
+
+async function createPlan() {
+  const ctx = state.data && state.data.today ? { acwr: state.data.today.acwr, readiness: state.data.today.readiness } : {};
+  const body = {
+    coach: planState.name,
+    athlete: $("#plan_athlete").value.trim(),
+    title: $("#plan_title").value.trim(),
+    start: $("#plan_start").value.trim(),
+    weeks: Number($("#plan_weeks").value),
+    base_load: Number($("#plan_base").value),
+    context: ctx,
+  };
+  const r = await fetch("/api/plans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (d.error) return alert(d.error);
+  await loadPlans();
+  await openPlan(d.plan.id);
+}
+
+async function openPlan(id) {
+  const r = await fetch("/api/plans/" + id);
+  const d = await r.json();
+  if (d.error) return alert(d.error);
+  planState.current = d.plan;
+  renderPlanList();
+  renderPlanDetail();
+}
+
+async function planAction(action, extra) {
+  if (!planState.current) return;
+  const body = Object.assign({ actor: { role: planState.role, name: planState.name } }, extra || {});
+  const r = await fetch("/api/plans/" + planState.current.id + "/" + action, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  if (d.error) return alert(d.error);
+  planState.current = d.plan;
+  renderPlanList();
+  renderPlanDetail();
+  loadPlans();
+}
+
+function doWriteback() {
+  if (!state.data || !state.data.days) return alert("请先在「模拟训练 / 自定义日志」中生成分析结果");
+  planAction("writeback", { days: state.data.days });
+}
+
+/* 当前角色在当前状态下可执行的操作 */
+function planActions(p) {
+  const acts = [];
+  const me = planState.role;
+  if (p.status === "draft" && me === "coach") acts.push({ a: "submit", label: "提交运动员确认", primary: true });
+  if (p.status === "pending" && me === "athlete") {
+    acts.push({ a: "confirm", label: "确认执行", primary: true });
+    acts.push({ a: "revise", label: "退回修改" });
+  }
+  if (p.status === "pending" && me === "coach") acts.push({ a: "revise", label: "撤回修改" });
+  if (p.status === "pending" && me === "rehab" && p.risk && p.risk.high) {
+    acts.push({ a: "review", label: "复核通过", primary: true, extra: { decision: "approved" } });
+    acts.push({ a: "review", label: "复核退回", danger: true, extra: { decision: "rejected" } });
+  }
+  if (p.status === "active" && (me === "coach" || me === "athlete")) acts.push({ a: "pause", label: "暂停计划" });
+  if (p.status === "paused" && (me === "coach" || me === "athlete")) acts.push({ a: "resume", label: "恢复执行", primary: true });
+  if (p.status !== "archived" && me === "coach") acts.push({ a: "archive", label: "归档", danger: true });
+  return acts;
+}
+
+function renderPlanDetail() {
+  const p = planState.current;
+  const el = $("#plan_detail");
+  if (!p) { el.innerHTML = `<div class="chart-box">从左侧选择或创建一个协作计划</div>`; return; }
+  $("#view_title").textContent = "协作计划 · " + p.title;
+  $("#view_meta").textContent = `教练 ${p.coach} · 运动员 ${p.athlete} · ${p.start} 起 ${p.weeks} 周 · 编号 ${p.id}`;
+
+  const wb = p.writeback;
+  const reviewTxt = p.review
+    ? `${p.review.decision === "approved" ? "复核通过" : "复核退回"} · ${esc(p.review.by)} · ${fmtTime(p.review.at)}${p.review.note ? " · " + esc(p.review.note) : ""}`
+    : "等待康复师复核，通过前运动员无法确认执行";
+
+  el.innerHTML = `
+    <div class="status-row">
+      <div class="stat"><div class="k">计划状态</div>
+        <div class="v" style="font-size:17px">${statusTag(p.status)}</div>
+        <div style="font-size:12px;color:#5f7480">${p.risk && p.risk.high ? "⚠ " + esc(p.risk.reasons.join("；")) : "风险评估正常"}</div></div>
+      <div class="stat"><div class="k">周负荷增幅上限</div>
+        <div class="v">${p.max_progression_pct}<small> %</small></div>
+        <div style="font-size:12px;color:#5f7480">安全阈值 ≤ 10%</div></div>
+      <div class="stat"><div class="k">执行覆盖</div>
+        <div class="v">${wb ? wb.completion_pct : 0}<small> %</small></div>
+        <div style="font-size:12px;color:#5f7480">${wb ? "已回写 " + wb.covered_days + " / " + wb.total_days + " 天" : "尚未回写分析"}</div></div>
+      <div class="stat"><div class="k">依从率</div>
+        <div class="v">${wb && wb.adherence_pct != null ? wb.adherence_pct : "—"}<small>${wb && wb.adherence_pct != null ? " %" : ""}</small></div>
+        <div style="font-size:12px;color:#5f7480">${wb ? "实际 " + wb.actual_load + " / 计划 " + wb.planned_load + " sRPE" : "—"}</div></div>
+    </div>
+    ${p.risk && p.risk.high ? `<div class="risk-box"><b>高风险复核</b>：${reviewTxt}</div>` : ""}
+    <div class="act-row" id="plan_acts"></div>
+    <div class="chart-box">
+      <h3>周期化周目标</h3>
+      <table class="tbl"><thead><tr><th>周次</th><th>目标负荷</th><th>类型</th></tr></thead>
+      <tbody>${p.weekly_targets.map(w => `
+        <tr><td>第 ${w.week} 周</td><td><b>${w.target}</b> sRPE</td>
+        <td class="${w.deload ? "deload" : ""}">${w.deload ? "减载周，主动恢复" : "训练周"}</td></tr>`).join("")}</tbody></table>
+    </div>
+    <div class="chart-box">
+      <h3>逐日安排与回写（负荷分析 · 准备度 · 每日处方）</h3>
+      <table class="tbl daytbl"><thead><tr><th>日期</th><th>周</th><th>计划</th><th>区间</th><th>实际</th><th>ACWR</th><th>准备度</th><th>当日处方</th><th>状态</th></tr></thead>
+      <tbody>${p.days.map(d => `
+        <tr>
+          <td>${d.date}</td><td>W${d.week}</td>
+          <td>${d.planned_load || "—"}</td><td>${esc(d.zone_label)}</td>
+          <td>${d.actual_load != null ? d.actual_load : "—"}</td>
+          <td>${d.acwr != null ? d.acwr : "—"}</td>
+          <td>${d.readiness != null ? d.readiness + (d.readiness_label ? "（" + esc(d.readiness_label) + "）" : "") : "—"}</td>
+          <td>${d.prescription ? esc(d.prescription.intensity.zone.label) + " · " + (d.prescription.suggested_load != null ? d.prescription.suggested_load + " sRPE" : "—") : "—"}</td>
+          <td>${d.done ? "✓" : ""}</td>
+        </tr>`).join("")}</tbody></table>
+    </div>
+    <div class="chart-box">
+      <h3>流转记录</h3>
+      <div class="tl">${p.history.slice().reverse().map(h => `
+        <div class="e">${fmtTime(h.at)} · ${ROLE_LABEL[h.by.role] || h.by.role} ${esc(h.by.name)} · ${ACT_LABEL[h.action] || h.action}${h.note ? " · " + esc(h.note) : ""}</div>`).join("")}
+      </div>
+    </div>`;
+
+  const row = $("#plan_acts");
+  planActions(p).forEach(a => {
+    const b = document.createElement("button");
+    b.className = "btn" + (a.primary ? " primary" : "") + (a.danger ? " danger" : "");
+    b.textContent = a.label;
+    b.onclick = () => planAction(a.a, a.extra);
+    row.appendChild(b);
+  });
+  if (p.status === "active" || p.status === "paused") {
+    const b = document.createElement("button");
+    b.className = "btn primary";
+    b.textContent = "回写当前分析结果";
+    b.onclick = doWriteback;
+    row.appendChild(b);
+  }
+}
+
+$("#my_role").onchange = () => {
+  planState.role = $("#my_role").value;
+  planState.name = ROLE_NAMES[planState.role];
+  $("#my_name").value = planState.name;
+  $("#plan_new").classList.toggle("hide", planState.role !== "coach");
+  loadPlans();
+  renderPlanDetail();
+};
+$("#my_name").onchange = () => {
+  planState.name = $("#my_name").value.trim() || ROLE_NAMES[planState.role];
+  loadPlans();
+};
+$("#plan_base").oninput = () => { $("#plan_base_v").textContent = $("#plan_base").value; };
+$("#go_plan").onclick = createPlan;
 
 (async () => {
   state.meta = await (await fetch("/api/meta")).json();

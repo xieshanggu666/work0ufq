@@ -5,6 +5,7 @@ const R = require("../engine/recovery");
 const P = require("../engine/prescribe");
 const A = require("../engine/athlete");
 const AN = require("../engine/analyzer");
+const PL = require("../engine/plan");
 
 let passed = 0;
 let failed = 0;
@@ -323,6 +324,118 @@ t("自定义日志分析覆盖区间补全晨测", () => {
   const r = AN.analyzeLog({ sessions, profile: { sleep_need: 7.5 } });
   assert.strictEqual(r.days.length, 2);
   assert.strictEqual(r.days[1].rmssd, 70);
+});
+
+/* ---------- 协作计划 ---------- */
+t("计划创建：周期化周目标与逐日安排", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "王教练", athlete: "李运动员", start: "2026-10-05", weeks: 4, base_load: 500 });
+  assert.strictEqual(p.status, "draft");
+  assert.strictEqual(p.weekly_targets.length, 4);
+  assert.deepStrictEqual(p.weekly_targets.map(w => w.target), [500, 540, 580, 348]);
+  assert.strictEqual(p.days.length, 28);
+  assert.strictEqual(p.days[0].date, "2026-10-05");
+  assert.strictEqual(p.days[6].planned_load, 0); // 周日休息
+  const w1 = p.days.slice(0, 7).reduce((s, d) => s + d.planned_load, 0);
+  assert(Math.abs(w1 - 500) <= 7); // 逐日取整误差
+});
+
+t("逐日安排：休息日与大负荷日强度区间合理", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 1, base_load: 500 });
+  assert.strictEqual(p.days[6].zone, "rest"); // 周日休息
+  assert.strictEqual(p.days[5].zone, "z2");   // 周六长距离低强度
+  assert.strictEqual(p.days[2].zone, "z1");   // 周三小负荷恢复
+});
+
+t("状态机：完整流转 草稿→待确认→执行→暂停→执行→归档", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  PL.transition(store, p.id, "submit", { role: "coach", name: "C" });
+  assert.strictEqual(p.status, "pending");
+  PL.transition(store, p.id, "confirm", { role: "athlete", name: "A" });
+  assert.strictEqual(p.status, "active");
+  PL.transition(store, p.id, "pause", { role: "athlete", name: "A" });
+  assert.strictEqual(p.status, "paused");
+  PL.transition(store, p.id, "resume", { role: "coach", name: "C" });
+  assert.strictEqual(p.status, "active");
+  PL.transition(store, p.id, "archive", { role: "coach", name: "C" });
+  assert.strictEqual(p.status, "archived");
+  assert(p.history.length >= 6);
+});
+
+t("状态机：非法流转与越权被拒绝", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  assert.throws(() => PL.transition(store, p.id, "confirm", { role: "athlete" })); // 草稿不能直接确认
+  assert.throws(() => PL.transition(store, p.id, "submit", { role: "athlete" })); // 运动员不能提交
+  assert.throws(() => PL.transition(store, p.id, "archive", { role: "rehab" }));  // 康复师不能归档
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  assert.throws(() => PL.transition(store, p.id, "pause", { role: "coach" }));    // 待确认不能暂停
+});
+
+t("高风险计划须康复师复核通过后方可确认", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500, context: { acwr: 1.7, readiness: 35 } });
+  assert(p.risk.high);
+  assert(p.risk.reasons.length >= 2);
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  assert.throws(() => PL.transition(store, p.id, "confirm", { role: "athlete" }));
+  PL.transition(store, p.id, "review", { role: "rehab", name: "R" }, { decision: "approved" });
+  assert.strictEqual(p.status, "pending");
+  PL.transition(store, p.id, "confirm", { role: "athlete" });
+  assert.strictEqual(p.status, "active");
+});
+
+t("复核退回回到草稿，非高风险无需复核", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500, context: { acwr: 1.7 } });
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  PL.transition(store, p.id, "review", { role: "rehab" }, { decision: "rejected", note: "负荷过高" });
+  assert.strictEqual(p.status, "draft");
+  const q = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  PL.transition(store, q.id, "submit", { role: "coach" });
+  assert.throws(() => PL.transition(store, q.id, "review", { role: "rehab" }, { decision: "approved" }));
+});
+
+t("运动员退回待确认计划回到草稿", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  PL.transition(store, p.id, "revise", { role: "athlete", name: "A" }, { note: "周三强度太大" });
+  assert.strictEqual(p.status, "draft");
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  assert.strictEqual(p.status, "pending");
+});
+
+t("周增幅超 10% 判定为高风险", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500, increment: 0.15 });
+  assert(p.max_progression_pct > 10);
+  assert(p.risk.high);
+});
+
+t("回写：填充实际负荷、准备度与每日处方并统计依从率", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  PL.transition(store, p.id, "submit", { role: "coach" });
+  PL.transition(store, p.id, "confirm", { role: "athlete" });
+  const days = p.days.slice(0, 7).map(d => ({ date: d.date, load: d.planned_load, acwr: 1.0, chronic: 400, score: 80, label: { label: "状态极佳" } }));
+  PL.writeBack(store, p.id, days);
+  assert.strictEqual(p.writeback.covered_days, 7);
+  assert.strictEqual(p.writeback.adherence_pct, 100);
+  assert.strictEqual(p.writeback.completion_pct, 25);
+  const d0 = p.days[0];
+  assert.strictEqual(d0.actual_load, d0.planned_load);
+  assert.strictEqual(d0.readiness, 80);
+  assert(d0.prescription && d0.prescription.intensity.zone.key);
+  assert.strictEqual(p.days[7].done, false);
+});
+
+t("回写：非执行状态拒绝回写", () => {
+  const store = PL.createStore();
+  const p = PL.createPlan(store, { coach: "C", athlete: "A", start: "2026-10-05", weeks: 4, base_load: 500 });
+  assert.throws(() => PL.writeBack(store, p.id, []));
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");
