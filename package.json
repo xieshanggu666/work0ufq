@@ -1,0 +1,10 @@
+{
+  "name": "athlete-load",
+  "version": "1.0.0",
+  "description": "个人运动训练负荷与恢复管理系统",
+  "scripts": {
+    "dev": "node start.js",
+    "test": "node tests/run_tests.js"
+  },
+  "license": "MIT"
+}
