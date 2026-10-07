@@ -94,6 +94,62 @@
   .tbl th { color: var(--muted); font-weight: 600; font-size: 12px; }
   .tbl .deload { color: var(--amber); font-weight: 700; }
   .hide { display: none; }
+  /* 协作计划 */
+  .role-row { display: flex; gap: 6px; margin: 10px 0 12px; }
+  .role-chip {
+    flex: 1; text-align: center; padding: 7px 0; border-radius: 999px; font-size: 12.5px;
+    border: 1px solid var(--line); background: #fafcfb; cursor: pointer; font-weight: 600;
+  }
+  .role-chip.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-dark); }
+  .plan-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .plan-card {
+    border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; cursor: pointer;
+    background: #fafcfb; transition: border-color .15s;
+  }
+  .plan-card:hover { border-color: var(--brand); }
+  .plan-card.on { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(31,122,140,.12); }
+  .plan-card .pc-t { font-size: 13.5px; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .plan-card .pc-m { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; color: #fff; white-space: nowrap; }
+  .badge.risk-high { background: var(--red); }
+  .badge.risk-warn { background: var(--amber); }
+  .badge.risk-low { background: var(--green); }
+  .badge.ghost { background: #9aa5a0; }
+  .btn {
+    padding: 8px 14px; border-radius: 9px; border: 1px solid var(--brand); background: var(--brand);
+    color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn.ghost { background: #fff; color: var(--brand-dark); }
+  .btn.amber { background: var(--amber); border-color: var(--amber); }
+  .btn.red { background: var(--red); border-color: var(--red); }
+  .btn.blue { background: var(--blue); border-color: var(--blue); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .panel-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+  .panel-card h3 { font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .risk-item { border-left: 3px solid var(--line); padding: 7px 11px; margin-bottom: 7px; font-size: 12.5px; background: #fafcfb; border-radius: 0 8px 8px 0; }
+  .risk-item.high { border-color: var(--red); }
+  .risk-item.warn { border-color: var(--amber); }
+  .risk-item.info { border-color: var(--blue); }
+  .timeline { list-style: none; }
+  .timeline li { position: relative; padding: 0 0 12px 18px; font-size: 12px; color: #33474f; border-left: 2px solid var(--line); margin-left: 5px; }
+  .timeline li:before { content: ""; position: absolute; left: -6px; top: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); }
+  .timeline li .t-time { color: var(--muted); margin-right: 6px; }
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .day-cell { border: 1px solid var(--line); border-radius: 8px; padding: 7px; font-size: 11.5px; min-height: 92px; background: #fafcfb; }
+  .day-cell.rest { background: #f3f6f4; color: var(--muted); }
+  .day-cell.proj { border-style: dashed; }
+  .day-cell .dc-d { font-weight: 700; font-size: 12px; margin-bottom: 4px; }
+  .day-cell .dc-l { color: var(--brand-dark); font-weight: 700; }
+  .day-cell .dc-s { color: var(--muted); line-height: 1.5; }
+  .week-head { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 6px; font-size: 13px; }
+  .note-input { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; font-size: 13px; background: #fafcfb; outline: none; margin-top: 6px; }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 34px 0; }
+  .kv { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 12.5px; color: #33474f; }
+  .kv b { color: var(--ink); }
+  dialog { border: none; border-radius: 14px; padding: 20px; width: min(560px, 92vw); box-shadow: 0 18px 60px rgba(20,60,70,.25); }
+  dialog::backdrop { background: rgba(32,48,58,.4); }
+  dialog h3 { font-size: 16px; margin-bottom: 12px; }
   @media (max-width: 940px) {
     .wrap { flex-direction: column; }
     .side { width: 100%; height: auto; position: static; }
@@ -109,6 +165,7 @@
     <div class="tabs">
       <div class="tab on" data-tab="sim">模拟训练</div>
       <div class="tab" data-tab="log">自定义日志</div>
+      <div class="tab" data-tab="plan">协作计划</div>
     </div>
 
     <div id="sim_panel">
@@ -167,10 +224,28 @@
       <button class="go" id="go_log">分析日志</button>
     </div>
 
-    <div class="hint">采用 sRPE 与 Banister TRIMP 双口径负荷，EWMA 平滑计算急性（7 日）/慢性（28 日）负荷与 ACWR；以体能-疲劳脉冲响应、HRV 平衡、睡眠债与主观状态合成准备度评分，据此给出当日训练处方。</div>
+    <div id="plan_panel" class="hide">
+      <div class="field">
+        <label>当前身份（切换可见操作）</label>
+        <div class="role-row">
+          <div class="role-chip on" data-role="coach">教练</div>
+          <div class="role-chip" data-role="athlete">运动员</div>
+          <div class="role-chip" data-role="therapist">康复师</div>
+        </div>
+      </div>
+      <div class="field" style="display:flex;gap:8px;">
+        <button class="btn" id="plan_new" style="flex:1">＋ 新建周期计划</button>
+        <button class="btn ghost" id="plan_refresh">刷新</button>
+      </div>
+      <div class="plan-list" id="plan_list"></div>
+      <div class="hint">教练制定周期计划并提交；高风险（周增幅＞20%、当前 ACWR 危险、准备度过低、投影峰值越界等）自动挂起康复师复核，复核通过后运动员方可确认执行。</div>
+    </div>
+
+    <div id="sim_hint" class="hint" style="margin-top:14px">采用 sRPE 与 Banister TRIMP 双口径负荷，EWMA 平滑计算急性（7 日）/慢性（28 日）负荷与 ACWR；以体能-疲劳脉冲响应、HRV 平衡、睡眠债与主观状态合成准备度评分，据此给出当日训练处方。</div>
   </aside>
 
   <main class="main">
+    <div id="analysis_view">
     <div class="topbar">
       <h2 id="view_title">今日状态与处方</h2>
       <div class="meta" id="view_meta"></div>
@@ -223,13 +298,61 @@
       <h3>未来四周训练周期化</h3>
       <table class="tbl" id="period_tbl"></table>
     </div>
+    </div>
+
+    <div id="plan_view" class="hide">
+      <div class="topbar">
+        <h2>教练训练计划协作</h2>
+        <div class="meta" id="plan_view_meta">草稿 → 待确认 → 执行中 → 暂停 → 归档；高风险须康复师复核</div>
+      </div>
+      <div id="plan_workspace"><div class="empty">从左侧选择或新建一份周期计划</div></div>
+    </div>
   </main>
 </div>
+
+<dialog id="plan_dialog">
+  <form method="dialog" id="plan_form">
+    <h3 id="plan_dialog_title">新建周期计划</h3>
+    <input type="hidden" id="pf_id">
+    <div class="row2">
+      <div class="field"><label>计划名称</label><input type="text" id="pf_title" value="备赛周期计划"></div>
+      <div class="field"><label>运动员</label><input type="text" id="pf_athlete" value="张运动员"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>教练</label><input type="text" id="pf_coach" value="李教练"></div>
+      <div class="field"><label>主项</label>
+        <select id="pf_sport">
+          <option value="run">跑步</option><option value="ride">骑行</option>
+          <option value="swim">游泳</option><option value="strength">力量</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>开始日期（周一）</label><input type="date" id="pf_start" value="2026-03-09"></div>
+      <div class="field"><label>周数</label>
+        <select id="pf_weeks">
+          <option value="1">1 周</option><option value="2">2 周</option>
+          <option value="4" selected>4 周</option><option value="8">8 周</option>
+          <option value="12">12 周</option><option value="16">16 周</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>周基准负荷</label><input type="number" id="pf_base" value="500" min="100" max="2000" step="10"></div>
+      <div class="field"><label>周递增</label><input type="number" id="pf_inc" value="0.08" min="-0.2" max="0.3" step="0.01"></div>
+    </div>
+    <div class="field"><label>减载比例</label><input type="number" id="pf_deload" value="0.6" min="0.3" max="0.9" step="0.05"></div>
+    <div class="btn-row" style="justify-content:flex-end;margin-top:6px">
+      <button type="button" class="btn ghost" id="pf_cancel">取消</button>
+      <button type="button" class="btn" id="pf_save">保存草稿并评估风险</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
-const state = { data: null, meta: null };
+const state = { data: null, meta: null, role: "coach", plans: [], currentId: null, analysisTab: "sim", sessions: null, morning: null, profile: null };
 
 /* ---------- 工具 ---------- */
 function fmtDate(s) {
@@ -268,30 +391,54 @@ function drawAxes(ctx, w, h, pad, yMax, yMin, labels, y2Max, y2Labels) {
   });
 }
 
-function drawSeries(ctx, pts, w, h, pad, yMax, yMin, color, width = 2, fill = false) {
+function drawSeries(ctx, pts, w, h, pad, yMax, yMin, color, width = 2, fill = false, dashIdx = null) {
   const x0 = pad.left, x1 = w - pad.right;
   const y0 = pad.top, y1 = h - pad.bottom;
-  ctx.beginPath();
-  pts.forEach((v, i) => {
-    const x = x0 + (x1 - x0) * i / Math.max(1, pts.length - 1);
-    const y = y1 - (y1 - y0) * (v - yMin) / (yMax - yMin);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
+  const px = i => x0 + (x1 - x0) * i / Math.max(1, pts.length - 1);
+  const py = v => y1 - (y1 - y0) * (v - yMin) / (yMax - yMin);
+  const trace = (a, b, dashed) => {
+    ctx.beginPath();
+    let pen = false;
+    for (let i = a; i <= b; i++) {
+      if (pts[i] == null) { pen = false; continue; }
+      const x = px(i), y = py(pts[i]);
+      pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      pen = true;
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.setLineDash(dashed ? [5, 4] : []);
+    ctx.stroke();
+  };
   if (fill) {
+    ctx.beginPath();
+    let pen = false;
+    pts.forEach((v, i) => {
+      if (v == null) { pen = false; return; }
+      const x = px(i), y = py(v);
+      pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      pen = true;
+    });
     ctx.lineTo(x1, y1); ctx.lineTo(x0, y1); ctx.closePath();
     ctx.fillStyle = color; ctx.globalAlpha = 0.12; ctx.fill(); ctx.globalAlpha = 1;
   }
-  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.stroke();
+  if (dashIdx != null && dashIdx > 0 && dashIdx < pts.length) {
+    trace(0, dashIdx, false);
+    trace(dashIdx - 1, pts.length - 1, true);
+    ctx.setLineDash([]);
+  } else {
+    trace(0, pts.length - 1, false);
+    ctx.setLineDash([]);
+  }
 }
 
-function drawBars(ctx, vals, w, h, pad, yMax, yMin, color) {
+function drawBars(ctx, vals, w, h, pad, yMax, yMin, color, flags) {
   const x0 = pad.left, x1 = w - pad.right, y1 = h - pad.bottom;
   const n = vals.length;
   const bw = (x1 - x0) / n * 0.55;
-  ctx.fillStyle = color;
   vals.forEach((v, i) => {
     const x = x0 + (x1 - x0) * i / Math.max(1, n - 1);
     const y = y1 - (y1 - pad.top) * (v - yMin) / (yMax - yMin);
+    ctx.fillStyle = flags && flags[i] === "planned" ? "#bcd7df" : color;
     ctx.fillRect(x - bw / 2, y, bw, y1 - y);
   });
 }
@@ -311,10 +458,10 @@ function chart(cv, opts) {
       ctx.globalAlpha = 1;
     }
   }
-  if (opts.bars) drawBars(ctx, opts.bars.vals, w, h, pad, opts.yMax, opts.yMin || 0, opts.bars.color);
-  (opts.series || []).forEach(s => drawSeries(ctx, s.pts, w, h, pad, opts.yMax, opts.yMin || 0, s.color, s.width, s.fill));
+  if (opts.bars) drawBars(ctx, opts.bars.vals, w, h, pad, opts.yMax, opts.yMin || 0, opts.bars.color, opts.bars.flags);
+  (opts.series || []).forEach(s => drawSeries(ctx, s.pts, w, h, pad, opts.yMax, opts.yMin || 0, s.color, s.width, s.fill, s.dashIdx));
   if (opts.y2Series) {
-    opts.y2Series.forEach(s => drawSeries(ctx, s.pts, w, h, pad, opts.y2Max, 0, s.color, s.width));
+    opts.y2Series.forEach(s => drawSeries(ctx, s.pts, w, h, pad, opts.y2Max, 0, s.color, s.width, false, s.dashIdx));
   }
 }
 
@@ -364,6 +511,9 @@ function renderCharts(a) {
   const acute = days.map(d => d.acute);
   const chronic = days.map(d => d.chronic);
   const acwr = days.map(d => d.acwr == null ? 0 : d.acwr);
+  const loadFlags = days.map(d => (d.is_projected ? "planned" : "actual"));
+  const projIdx = days.findIndex(d => d.is_projected);
+  const dashAt = projIdx > 0 ? projIdx : null;
   const loadMax = Math.max(...loads) * 1.15;
   const ffMax = Math.max(...days.map(d => Math.max(d.fitness, d.fatigue, d.performance))) * 1.1;
   const ffMin = Math.min(0, ...days.map(d => d.performance)) * 1.1;
@@ -372,12 +522,12 @@ function renderCharts(a) {
     yMax: loadMax,
     y2: true, y2Max: 2.0,
     labels,
-    bars: { vals: loads, color: "#9fb8b0" },
+    bars: { vals: loads, color: "#9fb8b0", flags: loadFlags },
     series: [
-      { pts: acute, color: "#1f7a8c" },
-      { pts: chronic, color: "#d98e2b" },
+      { pts: acute, color: "#1f7a8c", dashIdx: dashAt },
+      { pts: chronic, color: "#d98e2b", dashIdx: dashAt },
     ],
-    y2Series: [{ pts: acwr, color: "#5b8db8" }],
+    y2Series: [{ pts: acwr, color: "#5b8db8", dashIdx: dashAt }],
     bands: [
       { from: 0, to: 0.8, color: "#5b8db8" },
       { from: 0.8, to: 1.3, color: "#2e8b57" },
@@ -389,24 +539,24 @@ function renderCharts(a) {
   chart($("#chart_ff"), {
     yMax: ffMax, yMin: ffMin, labels,
     series: [
-      { pts: days.map(d => d.fitness), color: "#2e8b57", fill: false },
-      { pts: days.map(d => d.fatigue), color: "#c0392b" },
-      { pts: days.map(d => d.performance), color: "#5b8db8", width: 2.5 },
+      { pts: days.map(d => d.fitness), color: "#2e8b57", fill: false, dashIdx: dashAt },
+      { pts: days.map(d => d.fatigue), color: "#c0392b", dashIdx: dashAt },
+      { pts: days.map(d => d.performance), color: "#5b8db8", width: 2.5, dashIdx: dashAt },
     ],
   });
 
   chart($("#chart_readiness"), {
     yMax: 120, y2: true, y2Max: 1.6, labels,
-    series: [{ pts: days.map(d => d.score), color: "#1f7a8c", width: 2 }],
-    y2Series: [{ pts: days.map(d => d.hrv_balance == null ? 0 : d.hrv_balance), color: "#d98e2b", width: 1.5 }],
+    series: [{ pts: days.map(d => (d.score == null ? null : d.score)), color: "#1f7a8c", width: 2, dashIdx: dashAt }],
+    y2Series: [{ pts: days.map(d => (d.hrv_balance == null ? null : d.hrv_balance)), color: "#d98e2b", width: 1.5, dashIdx: dashAt }],
   });
 
   chart($("#chart_life"), {
     yMax: 120, labels,
     series: [
-      { pts: days.map(d => (d.sleep == null ? 0 : d.sleep * 10)), color: "#5b8db8" },
-      { pts: days.map(d => (d.energy == null ? 0 : d.energy)), color: "#2e8b57" },
-      { pts: days.map(d => (d.soreness == null ? 0 : d.soreness)), color: "#c0392b" },
+      { pts: days.map(d => (d.sleep == null ? null : d.sleep * 10)), color: "#5b8db8" },
+      { pts: days.map(d => (d.energy == null ? null : d.energy)), color: "#2e8b57" },
+      { pts: days.map(d => (d.soreness == null ? null : d.soreness)), color: "#c0392b" },
     ],
   });
 
@@ -443,6 +593,9 @@ async function simulate() {
   const body = { profile, weeks: Number($("#weeks").value), seed: Number($("#seed").value) };
   const r = await fetch("/api/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const d = await r.json();
+  state.sessions = d.athlete.sessions;
+  state.morning = d.athlete.morning;
+  state.profile = profile;
   $("#view_title").textContent = "今日状态与处方 · 种子 " + d.athlete.seed;
   renderAll(d.analysis);
 }
@@ -459,19 +612,353 @@ async function analyzeLog() {
   const profile = { sex: "m", rest_hr: Number($("#log_rest_hr").value), max_hr: Number($("#log_max_hr").value) };
   const r = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessions, morning, profile }) });
   const d = await r.json();
+  state.sessions = sessions;
+  state.morning = morning;
+  state.profile = profile;
   $("#view_title").textContent = "自定义日志分析";
   renderAll(d);
 }
 
+/* ---------- 协作计划 ---------- */
+const api = async (url, method = "GET", body) => {
+  const opt = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(url, opt);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "请求失败");
+  return d;
+};
+const roleName = r => (state.meta && state.meta.plan_roles ? state.meta.plan_roles[r].label : r);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const todayStr = () => {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+};
+/* 当前分析数据源（模拟/日志），用于风险评估与回写 */
+function currentAnalysisPayload(extra) {
+  const a = state.data;
+  if (!a || !a.today) return { ...extra };
+  const lastActual = [...a.days].reverse().find(d => !d.is_projected);
+  return {
+    sessions: state.sessions || [],
+    morning: state.morning || [],
+    profile: state.profile || {},
+    as_of: extra && extra.as_of ? extra.as_of : (lastActual ? lastActual.date : null),
+    ...extra,
+  };
+}
+
+async function loadPlans(selectId) {
+  const d = await api("/api/plans");
+  state.plans = d.plans;
+  renderPlanList(selectId);
+  if (selectId) return openPlan(selectId);
+  if (state.currentId) {
+    const fresh = state.plans.find(p => p.id === state.currentId);
+    if (fresh) renderWorkspace(await (await fetch("/api/plans/" + state.currentId)).json().then(x => x.plan));
+  }
+}
+
+function renderPlanList(selectId) {
+  const el = $("#plan_list");
+  if (!state.plans.length) { el.innerHTML = `<div class="empty" style="padding:16px 0">暂无计划，点击上方新建</div>`; return; }
+  el.innerHTML = state.plans.map(p => {
+    const st = state.meta.plan_statuses[p.status];
+    const riskBadge = p.review_required ? `<span class="badge risk-high">待复核</span>`
+      : p.risk_level === "high" ? `<span class="badge risk-high">高风险</span>`
+      : p.risk_level === "warn" ? `<span class="badge risk-warn">需关注</span>` : "";
+    return `<div class="plan-card ${p.id === (selectId || state.currentId) ? "on" : ""}" data-id="${p.id}">
+      <div class="pc-t"><span>${esc(p.title)}</span><span class="badge" style="background:${st.color}">${st.label}</span></div>
+      <div class="pc-m">${esc(p.athlete_name)} · ${p.weeks} 周 · ${p.start_date} ~ ${p.end_date} ${riskBadge}</div>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".plan-card").forEach(c => c.onclick = () => { state.currentId = c.dataset.id; switchView("plan"); openPlan(c.dataset.id); });
+}
+
+async function openPlan(id) {
+  state.currentId = id;
+  const { plan } = await api("/api/plans/" + id);
+  renderWorkspace(plan);
+  renderPlanList(id);
+}
+
+function riskBadgeHtml(level) {
+  if (level === "high") return `<span class="badge risk-high">高风险</span>`;
+  if (level === "warn") return `<span class="badge risk-warn">需关注</span>`;
+  if (level === "low") return `<span class="badge risk-low">风险可控</span>`;
+  return `<span class="badge ghost">未评估</span>`;
+}
+
+function actionButtons(plan) {
+  const role = state.role;
+  const s = plan.status;
+  const btn = (action, label, cls = "", disabled = false) =>
+    `<button class="btn ${cls}" data-act="${action}" ${disabled ? "disabled" : ""}>${label}</button>`;
+  let html = "";
+  if (s === "draft") {
+    html += btn("edit", "修订", "ghost", role !== "coach");
+    html += btn("submit", "提交运动员确认", "", role !== "coach");
+    html += btn("archive", "归档", "ghost", role !== "coach");
+  } else if (s === "pending_confirmation") {
+    if (plan.review && plan.review.required) {
+      const pending = plan.review.status === "pending";
+      html += `<span class="badge risk-high">康复师复核：${pending ? "等待中" : plan.review.status === "approved" ? "已通过" : "已退回"}</span>`;
+      if (pending) {
+        html += btn("approve", "复核通过", "", role !== "therapist");
+        html += btn("request_changes", "退回修改", "amber", role !== "therapist");
+      }
+    }
+    html += btn("confirm", "运动员确认执行", "", role !== "athlete" || (plan.review && plan.review.required && plan.review.status !== "approved"));
+    html += btn("revise", "教练撤回修订", "ghost", role !== "coach");
+  } else if (s === "executing") {
+    html += btn("pause", "暂停", "blue", role !== "coach" && role !== "athlete");
+    html += btn("archive", "归档", "ghost", role !== "coach");
+  } else if (s === "paused") {
+    html += btn("resume", "恢复执行", "", role !== "coach" && role !== "athlete");
+    html += btn("revise", "修订计划", "ghost", role !== "coach");
+    html += btn("archive", "归档", "ghost", role !== "coach");
+  } else {
+    html += `<span class="badge ghost">已结束</span>`;
+  }
+  return `<div class="btn-row">${html}</div><input class="note-input" id="act_note" placeholder="操作备注（可选）">`;
+}
+
+function riskPanel(plan) {
+  const r = plan.risk;
+  if (!r) return `<div class="panel-card"><h3>风险评估</h3><div class="empty" style="padding:14px 0">尚未评估，提交时将自动基于当前负荷分析与计划投影评估</div></div>`;
+  const items = r.factors.length ? r.factors.map(f =>
+    `<div class="risk-item ${f.level}"><b>${f.level === "high" ? "高风险" : f.level === "warn" ? "关注" : "提示"}</b> · ${esc(f.message)}</div>`).join("")
+    : `<div class="risk-item info">未发现显著风险因素，可按流程确认执行</div>`;
+  return `<div class="panel-card"><h3>风险评估 ${riskBadgeHtml(r.level)}
+      <span style="font-size:12px;color:var(--muted);font-weight:400">投影 ACWR 峰值 ${r.peak_acwr != null ? r.peak_acwr + (r.peak_date ? "（" + r.peak_date + "）" : "") : "—"} · 最大周增幅 ${r.max_progression_pct}%</span>
+    </h3>${items}
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn ghost" id="btn_rerun">用当前分析数据重新评估</button>
+    </div></div>`;
+}
+
+function reviewPanel(plan) {
+  const rv = plan.review;
+  if (!rv || !rv.required) return "";
+  const map = { pending: "等待康复师复核", approved: "复核通过", changes_requested: "已退回修改" };
+  return `<div class="panel-card"><h3>康复师复核</h3>
+    <div class="kv">
+      <span>状态：<b>${map[rv.status] || rv.status}</b></span>
+      ${rv.therapist ? `<span>康复师：<b>${esc(rv.therapist)}</b></span>` : ""}
+      ${rv.note ? `<span>意见：${esc(rv.note)}</span>` : ""}
+    </div></div>`;
+}
+
+function writebackPanel(plan) {
+  const wb = plan.writeback;
+  const canAct = ["executing", "paused"].includes(plan.status);
+  const last = list => list.length ? list[list.length - 1] : null;
+  const lr = last(wb.readiness_snapshots);
+  const lw = last(wb.load_windows);
+  const lpre = list => [...list].reverse().slice(0, 5);
+  return `<div class="panel-card"><h3>回写（负荷分析 · 准备度 · 每日处方）</h3>
+    <div class="kv" style="margin-bottom:10px">
+      <span>最新准备度：<b>${lr ? lr.date + " " + lr.score + " 分" : "—"}</b></span>
+      <span>最新负荷窗口：<b>${lw ? lw.date_from + "~" + lw.date_to + "（实际 " + lw.actual_load + "）" : "—"}</b></span>
+      <span>处方留痕：<b>${wb.daily_prescriptions.length} 条</b></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost" data-wb="readiness" ${canAct ? "" : "disabled"}>回写当前准备度</button>
+      <button class="btn ghost" data-wb="load" ${canAct ? "" : "disabled"}>回写负荷窗口</button>
+      <button class="btn ghost" data-wb="prescription" ${canAct ? "" : "disabled"}>生成并回写当日处方</button>
+      <button class="btn ghost" data-wb="analyze">载入计划分析视图</button>
+    </div>
+    <div id="wb_result" style="margin-top:10px;font-size:12.5px"></div>
+    ${lpre(wb.daily_prescriptions).length ? `<table class="tbl" style="margin-top:10px"><thead><tr><th>日期</th><th>强度区</th><th>建议负荷</th><th>执行</th></tr></thead><tbody>
+      ${lpre(wb.daily_prescriptions).map(x => `<tr><td>${x.date}</td><td>${esc(x.zone_label || "—")}</td><td>${x.suggested_load != null ? x.suggested_load : "—"}</td><td>${esc(x.plan_status)}</td></tr>`).join("")}
+    </tbody></table>` : ""}
+  </div>`;
+}
+
+function schedulePanel(plan) {
+  const asOf = plan.as_of || todayStr();
+  const dow = ["一", "二", "三", "四", "五", "六", "日"];
+  return `<div class="panel-card"><h3>每日处方日程
+      <span style="font-size:12px;color:var(--muted);font-weight:400">实线=已到期/实际 · 虚线=未来计划 · 截止 <input type="date" id="as_of" value="${asOf}" style="border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:12px"></span>
+    </h3>
+    ${plan.weekly_targets.map((w, wi) => `
+      <div class="week-head"><b>第 ${w.week} 周</b>
+        <span>目标 <b>${w.target}</b> sRPE ${w.deload ? '<span style="color:var(--amber);font-weight:700">· 减载周</span>' : ""}</span></div>
+      <div class="week-grid">
+        ${plan.schedule.slice(wi * 7, wi * 7 + 7).map(d => `
+          <div class="day-cell ${d.is_rest ? "rest" : ""} ${d.date > asOf ? "proj" : ""}">
+            <div class="dc-d">周${dow[d.day - 1]} ${d.date.slice(5)}</div>
+            ${d.is_rest ? `<div class="dc-s">休息 / 恢复</div>` : `
+              <div class="dc-l">${d.target_load} sRPE</div>
+              <div class="dc-s">${d.sessions.map(s => `${esc(s.sport_label)} ${s.minutes}′ RPE${s.rpe}`).join("<br>")}</div>`}
+          </div>`).join("")}
+      </div>`).join("")}
+  </div>`;
+}
+
+function timelinePanel(plan) {
+  return `<div class="panel-card"><h3>协作时间线</h3><ul class="timeline">
+    ${[...plan.timeline].reverse().map(e => `<li><span class="t-time">${e.at.replace("T", " ").slice(0, 16)}</span>
+      <b>${esc(e.actor || roleName(e.role))}</b>（${roleName(e.role)}）${esc({
+        create: "创建草稿", edit: "修订计划", submit: "提交确认",
+        review_approve: "复核通过", review_changes: "退回修改", confirm: "确认执行",
+        pause: "暂停", resume: "恢复执行", revise: "撤回修订", archive: "归档",
+        writeback_readiness: "回写准备度", writeback_load: "回写负荷分析", writeback_prescription: "回写每日处方",
+      }[e.action] || e.action)}
+      ${e.note ? ` · <span style="color:var(--muted)">${esc(e.note)}</span>` : ""}</li>`).join("")}
+  </ul></div>`;
+}
+
+function renderWorkspace(plan) {
+  const st = state.meta.plan_statuses[plan.status];
+  $("#plan_workspace").innerHTML = `
+    <div class="panel-card">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">
+        <h3 style="margin:0;font-size:17px">${esc(plan.title)} <span class="badge" style="background:${st.color}">${st.label}</span> ${riskBadgeHtml(plan.risk ? plan.risk.level : null)}</h3>
+        <span style="font-size:12px;color:var(--muted)">版本 v${plan.version}</span>
+      </div>
+      <div class="kv" style="margin-top:10px">
+        <span>运动员：<b>${esc(plan.athlete_name)}</b></span>
+        <span>教练：<b>${esc(plan.coach_name)}</b></span>
+        <span>主项：<b>${esc(plan.sport_label)}</b></span>
+        <span>周期：<b>${plan.start_date} ~ ${plan.end_date}（${plan.weeks} 周）</b></span>
+        <span>周基准：<b>${plan.base_load}</b> · 递增 <b>${Math.round(plan.increment * 100)}%</b> · 减载 <b>${Math.round(plan.deload * 100)}%</b></span>
+      </div>
+      ${plan.note ? `<div class="risk-item info" style="margin-top:10px">${esc(plan.note)}</div>` : ""}
+      <div style="margin-top:12px">${actionButtons(plan)}</div>
+    </div>
+    ${riskPanel(plan)}${reviewPanel(plan)}${writebackPanel(plan)}${schedulePanel(plan)}${timelinePanel(plan)}`;
+  bindWorkspace(plan);
+}
+
+function bindWorkspace(plan) {
+  document.querySelectorAll("#plan_workspace [data-act]").forEach(b => b.onclick = () => doAction(plan, b.dataset.act));
+  const rerun = $("#btn_rerun");
+  if (rerun) rerun.onclick = () => rerunRisk(plan);
+  document.querySelectorAll("#plan_workspace [data-wb]").forEach(b => b.onclick = () => doWriteback(plan, b.dataset.wb));
+  const asOf = $("#as_of");
+  if (asOf) asOf.onchange = () => { plan.as_of = asOf.value; };
+}
+
+async function doAction(plan, action) {
+  const note = $("#act_note") ? $("#act_note").value : "";
+  try {
+    if (action === "edit") return openCreateDialog(plan);
+    if (action === "approve" || action === "request_changes") {
+      await api(`/api/plans/${plan.id}/review`, "POST", { decision: action === "approve" ? "approve" : "request_changes", actor: "当前" + roleName("therapist"), note });
+    } else {
+      const body = { role: state.role, actor: "当前" + roleName(state.role), note, ...currentAnalysisPayload() };
+      if (action === "revise") body.action = "revise";
+      else body.action = action;
+      await api(`/api/plans/${plan.id}/transition`, "POST", body);
+    }
+    await loadPlans(plan.id);
+  } catch (e) { alert(e.message); }
+}
+
+async function rerunRisk(plan) {
+  try {
+    const d = await api(`/api/plans/${plan.id}/risk`, "POST", currentAnalysisPayload());
+    alert(`重新评估：${d.risk.label}（${d.risk.factors.length} 项因素）\n投影 ACWR 峰值：${d.projection ? d.projection.peak_acwr : "—"}`);
+    await openPlan(plan.id);
+  } catch (e) { alert(e.message); }
+}
+
+async function doWriteback(plan, kind) {
+  const box = $("#wb_result");
+  try {
+    let d;
+    if (kind === "analyze") {
+      d = await api(`/api/plans/${plan.id}/analyze`, "POST", currentAnalysisPayload());
+      state.data = d;
+      $("#view_title").textContent = "计划分析 · " + plan.title;
+      switchView("analysis");
+      renderAll(d);
+      return;
+    }
+    if (kind === "readiness") {
+      const a = state.data;
+      const score = a && a.today.readiness != null ? a.today.readiness : null;
+      if (score == null) { box.innerHTML = `<span style="color:var(--red)">请先在模拟/日志页生成带晨测的分析数据</span>`; return; }
+      d = await api(`/api/plans/${plan.id}/writeback/readiness`, "POST", { role: state.role, actor: "当前" + roleName(state.role), entry: { date: a.as_of || a.today.date, score, label: a.today.readiness_label ? a.today.readiness_label.key : null } });
+    } else {
+      d = await api(`/api/plans/${plan.id}/writeback/` + (kind === "load" ? "load" : "prescription"), "POST", currentAnalysisPayload({ role: state.role, actor: "当前" + roleName(state.role) }));
+    }
+    box.innerHTML = `<span style="color:var(--green)">✓ ${kind === "readiness" ? "准备度" : kind === "load" ? "负荷窗口" : "当日处方"}已回写（${new Date().toLocaleTimeString()}）</span>`;
+    await openPlan(plan.id);
+  } catch (e) { box.innerHTML = `<span style="color:var(--red)">${esc(e.message)}</span>`; }
+}
+
+/* ---------- 新建/修订对话框 ---------- */
+function openCreateDialog(plan) {
+  $("#plan_dialog_title").textContent = plan ? "修订周期计划（将生成新版本）" : "新建周期计划";
+  $("#pf_id").value = plan ? plan.id : "";
+  $("#pf_title").value = plan ? plan.title : "备赛周期计划";
+  $("#pf_athlete").value = plan ? plan.athlete_name : "张运动员";
+  $("#pf_coach").value = plan ? plan.coach_name : "李教练";
+  $("#pf_sport").value = plan ? plan.sport : "run";
+  $("#pf_start").value = plan ? plan.start_date : "2026-03-09";
+  $("#pf_weeks").value = plan ? plan.weeks : 4;
+  $("#pf_base").value = plan ? plan.base_load : 500;
+  $("#pf_inc").value = plan ? plan.increment : 0.08;
+  $("#pf_deload").value = plan ? plan.deload : 0.6;
+  $("#plan_dialog").showModal();
+}
+
+async function saveDialog() {
+  const id = $("#pf_id").value;
+  const payload = {
+    title: $("#pf_title").value, athlete_name: $("#pf_athlete").value, coach_name: $("#pf_coach").value,
+    sport: $("#pf_sport").value, start_date: $("#pf_start").value, weeks: Number($("#pf_weeks").value),
+    base_load: Number($("#pf_base").value), increment: Number($("#pf_inc").value), deload: Number($("#pf_deload").value),
+    role: "coach", ...currentAnalysisPayload(),
+  };
+  try {
+    let d;
+    if (id) {
+      d = await api("/api/plans/" + id, "PUT", { role: "coach", patch: payload, sessions: payload.sessions, morning: payload.morning, profile: payload.profile, as_of: payload.as_of });
+    } else {
+      d = await api("/api/plans", "POST", payload);
+    }
+    $("#plan_dialog").close();
+    await loadPlans(d.plan.id);
+    const r = d.plan.risk;
+    if (r && r.review_required) alert("计划已保存。检测到高风险因素，提交后将自动挂起康复师复核。");
+  } catch (e) { alert(e.message); }
+}
+
+/* ---------- 视图切换 ---------- */
+function switchView(name) {
+  $("#plan_view").classList.toggle("hide", name !== "plan");
+  $("#analysis_view").classList.toggle("hide", name === "plan");
+  const tab = document.querySelector(`.tab[data-tab="${name === "plan" ? "plan" : state.analysisTab || "sim"}"]`);
+  if (tab) document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === tab));
+  $("#sim_panel").classList.toggle("hide", name === "plan" || state.analysisTab === "log");
+  $("#log_panel").classList.toggle("hide", name === "plan" || state.analysisTab !== "log");
+  $("#plan_panel").classList.toggle("hide", name !== "plan");
+  $("#sim_hint").classList.toggle("hide", name === "plan");
+}
+
 document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
-    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
-    t.classList.add("on");
+    if (t.dataset.tab === "plan") { switchView("plan"); loadPlans(); return; }
+    state.analysisTab = t.dataset.tab;
+    switchView("analysis");
     const sim = t.dataset.tab === "sim";
     $("#sim_panel").classList.toggle("hide", !sim);
     $("#log_panel").classList.toggle("hide", sim);
+    $("#plan_panel").classList.add("hide");
   };
 });
+document.querySelectorAll(".role-chip").forEach(c => c.onclick = () => {
+  state.role = c.dataset.role;
+  document.querySelectorAll(".role-chip").forEach(x => x.classList.toggle("on", x === c));
+  if (state.currentId) openPlan(state.currentId);
+});
+$("#plan_new").onclick = () => openCreateDialog(null);
+$("#plan_refresh").onclick = () => loadPlans();
+$("#pf_cancel").onclick = () => $("#plan_dialog").close();
+$("#pf_save").onclick = saveDialog;
 
 $("#base_load").oninput = () => { $("#base_load_v").textContent = $("#base_load").value; };
 $("#go_sim").onclick = simulate;

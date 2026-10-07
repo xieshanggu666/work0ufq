@@ -5,6 +5,7 @@ const R = require("../engine/recovery");
 const P = require("../engine/prescribe");
 const A = require("../engine/athlete");
 const AN = require("../engine/analyzer");
+const PL = require("../engine/plan");
 
 let passed = 0;
 let failed = 0;
@@ -323,6 +324,224 @@ t("自定义日志分析覆盖区间补全晨测", () => {
   const r = AN.analyzeLog({ sessions, profile: { sleep_need: 7.5 } });
   assert.strictEqual(r.days.length, 2);
   assert.strictEqual(r.days[1].rmssd, 70);
+});
+
+/* ---------- 协作计划：周期与日程 ---------- */
+t("计划：生成草稿，日程覆盖全部天数且周日休息", () => {
+  const plan = PL.buildPlan({ start_date: "2026-04-06", weeks: 6, base_load: 500 });
+  assert.strictEqual(plan.status, "draft");
+  assert.strictEqual(plan.schedule.length, 42);
+  assert.strictEqual(plan.weekly_targets.length, 6);
+  assert.strictEqual(plan.schedule[6].is_rest, true);
+  assert.strictEqual(plan.schedule[6].target_load, 0);
+  assert(plan.schedule[5].sessions.length === 2);
+  assert.strictEqual(plan.schedule[5].target_load,
+    plan.schedule[5].sessions.reduce((s, x) => s + x.planned_load, 0));
+});
+
+t("计划：四周块递进后减载", () => {
+  const ts = PL.weeklyTargets(500, 4, 0.08, 0.6);
+  assert.deepStrictEqual(ts.map(w => w.target), [500, 540, 580, 348]);
+  assert.strictEqual(ts[3].deload, true);
+});
+
+t("计划：day_overrides 可强制休息日", () => {
+  const plan = PL.buildPlan({
+    start_date: "2026-04-06", weeks: 1,
+    day_overrides: { "2026-04-06": { rest: true } },
+  });
+  assert.strictEqual(plan.schedule[0].is_rest, true);
+});
+
+t("计划：修订仅允许在草稿态，版本递增并保留时间线", () => {
+  const plan = PL.buildPlan({ weeks: 4 });
+  const v = plan.version;
+  PL.rebuildPlan(plan, { weeks: 6 });
+  assert.strictEqual(plan.weeks, 6);
+  assert.strictEqual(plan.version, v + 1);
+  assert(plan.timeline.some(e => e.action === "edit"));
+  assert.throws(() => {
+    PL.transition(plan, "submit", { role: "coach" });
+    PL.rebuildPlan(plan, { weeks: 4 });
+  });
+});
+
+/* ---------- 协作计划：状态机与权限 ---------- */
+t("计划：低风险可经教练提交→运动员确认→执行→暂停→恢复→归档", () => {
+  const plan = PL.buildPlan({ weeks: 4, base_load: 500, increment: 0.05 });
+  PL.transition(plan, "submit", { role: "coach", risk: { review_required: false, level: "low", factors: [] } });
+  assert.strictEqual(plan.status, "pending_confirmation");
+  assert.strictEqual(plan.review, null);
+  PL.transition(plan, "confirm", { role: "athlete" });
+  assert.strictEqual(plan.status, "executing");
+  assert(plan.confirmation.confirmed_at);
+  PL.transition(plan, "pause", { role: "athlete" });
+  assert.strictEqual(plan.status, "paused");
+  PL.transition(plan, "resume", { role: "coach", risk: { review_required: false, level: "low", factors: [] } });
+  assert.strictEqual(plan.status, "executing");
+  PL.transition(plan, "archive", { role: "coach" });
+  assert.strictEqual(plan.status, "archived");
+});
+
+t("计划：非法角色或非法状态流转被拒绝", () => {
+  const plan = PL.buildPlan({ weeks: 4 });
+  assert.throws(() => PL.transition(plan, "confirm", { role: "athlete" })); // 草稿不可确认
+  assert.throws(() => PL.transition(plan, "submit", { role: "athlete" })); // 运动员不可提交
+  PL.transition(plan, "submit", { role: "coach", risk: { review_required: false, level: "low", factors: [] } });
+  assert.throws(() => PL.transition(plan, "review", { role: "coach" })); // 无 review 动作
+});
+
+t("计划：高风险提交后挂起康复师复核，复核通过方可确认", () => {
+  const plan = PL.buildPlan({ weeks: 4, base_load: 500, increment: 0.25 });
+  const risk = PL.assessRisk(plan, {});
+  assert.strictEqual(risk.review_required, true);
+  PL.transition(plan, "submit", { role: "coach", risk });
+  assert.strictEqual(plan.review.status, "pending");
+  assert.throws(() => PL.transition(plan, "confirm", { role: "athlete" }));
+  assert.throws(() => PL.review(plan, { role: "coach", decision: "approve" }));
+  PL.review(plan, { role: "therapist", decision: "approve", actor: "康复师王", note: "加强监控" });
+  assert.strictEqual(plan.review.status, "approved");
+  PL.transition(plan, "confirm", { role: "athlete" });
+  assert.strictEqual(plan.status, "executing");
+});
+
+t("计划：康复师退回修改后回到草稿，须重新提交", () => {
+  const plan = PL.buildPlan({ weeks: 4, increment: 0.25 });
+  PL.transition(plan, "submit", { role: "coach", risk: PL.assessRisk(plan, {}) });
+  PL.review(plan, { role: "therapist", decision: "request_changes", note: "增幅过大" });
+  assert.strictEqual(plan.status, "draft");
+  assert.strictEqual(plan.review.status, "changes_requested");
+});
+
+t("计划：暂停后恢复时若仍高风险，退回待确认复核", () => {
+  const plan = PL.buildPlan({ weeks: 4 });
+  PL.transition(plan, "submit", { role: "coach", risk: { review_required: false, level: "low", factors: [] } });
+  PL.transition(plan, "confirm", { role: "athlete" });
+  PL.transition(plan, "pause", { role: "coach" });
+  PL.transition(plan, "resume", { role: "coach", risk: PL.assessRisk(PL.buildPlan({ weeks: 4, increment: 0.25 }), {}) });
+  assert.strictEqual(plan.status, "pending_confirmation");
+  assert.strictEqual(plan.review.status, "pending");
+});
+
+/* ---------- 协作计划：风险评估 ---------- */
+t("风险：周增幅 >20% 判高风险，10-20% 为关注", () => {
+  assert.strictEqual(PL.assessRisk(PL.buildPlan({ weeks: 4, increment: 0.25 }), {}).level, "high");
+  assert.strictEqual(PL.assessRisk(PL.buildPlan({ weeks: 4, increment: 0.12 }), {}).level, "warn");
+  assert.strictEqual(PL.assessRisk(PL.buildPlan({ weeks: 4, increment: 0.05 }), {}).level, "low");
+});
+
+t("风险：当前 ACWR / 准备度纳入评估", () => {
+  const plan = PL.buildPlan({ weeks: 4, increment: 0.05 });
+  assert.strictEqual(PL.assessRisk(plan, { acwr: 1.6, readiness: 80 }).level, "high");
+  assert.strictEqual(PL.assessRisk(plan, { acwr: 1.0, readiness: 50 }).level, "warn");
+});
+
+t("风险：首周冲击慢性负荷触发高风险", () => {
+  const plan = PL.buildPlan({ weeks: 4, base_load: 1000, increment: 0.05 });
+  const r = PL.assessRisk(plan, { chronic: 80 }); // 慢性周负荷 560，首周 1000 → 1.79
+  assert.strictEqual(r.level, "high");
+  assert(r.factors.some(f => f.code === "first_week_load"));
+});
+
+/* ---------- 协作计划：负荷投影 ---------- */
+t("投影：实际历史 + 未来计划拼接，峰值出现在未来", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4, base_load: 900, increment: 0.08 });
+  const sessions = [];
+  for (let day = 0; day < 7; day++) {
+    sessions.push({ date: "2026-03-" + String(2 + day).padStart(2, "0"), rpe: 5, minutes: 60, avg_hr: 130, rest_hr: 55, max_hr: 196, sex: "m" });
+  }
+  const proj = PL.projectLoads(sessions, plan, "2026-03-08");
+  assert.strictEqual(proj.daily.filter(d => d.kind === "actual").length, 7);
+  assert(proj.daily.some(d => d.kind === "planned"));
+  assert(proj.peak_acwr != null);
+  assert(proj.peak_date >= "2026-03-09");
+});
+
+t("执行风险：危险 ACWR 或低准备度判高并建议降级", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4 });
+  const r = PL.executionRisk(plan, { date: "2026-03-09", acwr: 1.7, readiness: 80, week_accumulated: 300 });
+  assert.strictEqual(r.level, "high");
+  const r2 = PL.executionRisk(plan, { date: "2026-03-09", acwr: 1.0, readiness: 80, week_accumulated: 1 });
+  assert.strictEqual(r2.level, "low");
+  assert.strictEqual(PL.executionRisk(plan, { date: "2026-03-15", acwr: 1.0, readiness: 80, week_accumulated: 0 }).is_rest_day, true);
+});
+
+/* ---------- 协作计划：回写 ---------- */
+t("回写：准备度 / 负荷窗口 / 每日处方留痕（同日覆盖）", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4 });
+  PL.writeReadiness(plan, { date: "2026-03-09", score: 72, label: { key: "ok" } });
+  PL.writeReadiness(plan, { date: "2026-03-09", score: 68 });
+  assert.strictEqual(plan.writeback.readiness_snapshots.length, 1);
+  assert.strictEqual(plan.writeback.readiness_snapshots[0].score, 68);
+  PL.writePrescription(plan, {
+    date: "2026-03-09", intensity: { zone: { key: "z3", label: "节奏区" } },
+    suggested_load: 400, suggested_range: [360, 440], planned_load: 400, plan_status: "planned", note: "按计划",
+  });
+  assert.strictEqual(plan.writeback.daily_prescriptions[0].zone, "z3");
+  assert.throws(() => PL.writeReadiness(plan, { date: "bad", score: 50 }));
+  const actions = plan.timeline.map(e => e.action);
+  assert(actions.includes("writeback_readiness"));
+  assert(actions.includes("writeback_prescription"));
+});
+
+t("回写：负荷窗口提取实际区间与 ACWR", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4 });
+  const sessions = [];
+  for (let i = 0; i < 28; i++) {
+    const d = new Date(2026, 1, 9 + i);
+    sessions.push({
+      date: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"),
+      rpe: 6, minutes: 50, avg_hr: 135, rest_hr: 55, max_hr: 196, sex: "m",
+    });
+  }
+  const analysis = AN.analyzeLog({ sessions, profile: {}, plan, as_of: "2026-03-22" });
+  const rec = PL.writeLoadWindow(plan, analysis);
+  assert(rec.acwr != null);
+  assert(rec.date_from <= "2026-03-09");
+});
+
+/* ---------- 协作计划：分析管道接入 ---------- */
+t("管道：无计划时向后兼容（无 is_projected 影响既有结论）", () => {
+  const r = AN.analyzeLog({ sessions: [], morning: [], profile: { sleep_need: 7.5 } });
+  assert.strictEqual(r.today.acwr, null);
+  assert.strictEqual(r.days.length, 0);
+});
+
+t("管道：传入计划后时间轴延伸至计划结束，未来日标记投影", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 2 });
+  const analysis = AN.analyzeLog({ sessions: [], morning: [], profile: {}, plan, as_of: "2026-03-08" });
+  assert.strictEqual(analysis.days.length, 14);
+  assert(analysis.days.every(d => d.is_projected));
+  assert.strictEqual(analysis.days[0].planned_load, plan.schedule[0].target_load);
+  assert.strictEqual(analysis.days[0].score, null);
+  assert(analysis.projection.planned_remaining > 0);
+});
+
+t("管道：执行中当日处方附加计划课程；高风险自动降级", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4, base_load: 500 });
+  /* 2/2-3/6 慢性低负荷 + 3/4~3/6 与 3/9 骤升，周一 ACWR 进入危险区间 */
+  const sessions = [];
+  for (let i = 0; i < 36; i++) {
+    const t = new Date(2026, 1, 2 + i);
+    if (t.getDay() === 0 || t.getDay() === 6) continue;
+    const date = t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0");
+    const hi = (date >= "2026-03-04" && date <= "2026-03-06") || date === "2026-03-09";
+    const load = hi ? 1700 : 300;
+    sessions.push({ date, rpe: load / 60, minutes: 60, avg_hr: 135, rest_hr: 55, max_hr: 196, sex: "m" });
+  }
+  const analysis = AN.analyzeLog({ sessions, profile: {}, plan, as_of: "2026-03-09" });
+  assert.strictEqual(analysis.today.date, "2026-03-09");
+  assert(analysis.today.acwr > 1.5);
+  assert(analysis.prescription.planned);
+  assert.strictEqual(analysis.prescription.plan_status, "adjusted");
+  assert(analysis.prescription.suggested_load < analysis.prescription.planned.planned_load);
+});
+
+t("管道：计划休息日处方负荷归零", () => {
+  const plan = PL.buildPlan({ start_date: "2026-03-09", weeks: 4 });
+  const analysis = AN.analyzeLog({ sessions: [], morning: [], profile: {}, plan, as_of: "2026-03-15" });
+  assert.strictEqual(analysis.prescription.plan_status, "rest_day");
+  assert.strictEqual(analysis.prescription.suggested_load, 0);
 });
 
 console.log("\n" + passed + " passed, " + failed + " failed");
